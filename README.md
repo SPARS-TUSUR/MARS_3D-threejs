@@ -6,6 +6,10 @@ React-TypeScript-Electron-Three Визуализатор для см. МАРС
 ### `npm install`
 ### `yarn install`
 
+## Переключение с npm на yarn:
+
+### 'npm install --global yarn'
+
 ## Запуск программы в режиме отладки:
 
 ### `npm run electron:dev`
