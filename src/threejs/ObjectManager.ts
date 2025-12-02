@@ -34,8 +34,10 @@ const getAllObjects = () => MainScene.children
  * @returns id: number
  */
 const create = (params: CustomObjectParams) => {
+    console.log('=====[ObjectManager.create] params =', params);
     const object = createObject(params)
     MainScene.add(object)
+    console.log('=====[ObjectManager.create] added id=', object.id);
     return object.id
 }
 
@@ -170,5 +172,10 @@ const robj = (id: number) => {
     
     return
 }
+
+console.log("SCENE CHILDREN COUNT:", MainScene.children.length);
+MainScene.children.forEach((c, i) => {
+  console.log(i, "id:", c.id, "name:", c.name, "type:", c.type, "visible:", c.visible, "pos:", c.position ? c.position.toArray() : null, "scale:", c.scale ? c.scale.toArray() : null);
+});
 
 export { MainScene, camera as MainCamera, get_model_names, add_texture, getAllObjects, getObjectById, create, update, updateByName, group, rgroup, create_model, create_model_OBJ }

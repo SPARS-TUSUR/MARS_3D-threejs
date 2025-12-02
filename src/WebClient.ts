@@ -236,9 +236,9 @@ const createWebSocket = (port = 5001) => {
                 continue;
             }
             
-            let commandResult;
-            let id: number | null = null
-            let namess: any | null = null
+            // let commandResult;
+            // let id: number | null = null
+            // let namess: any | null = null
 
             // --- Здесь вызываем старую логику handleCommand и формируем ответ ---
             try 
@@ -248,7 +248,7 @@ const createWebSocket = (port = 5001) => {
 
                 // Вызов старой логики (функция handleCommand уже должна быть в том же файле/модуле)
                 // handleCommand возвращает: number | boolean | array/other | undefined (в твоём коде)
-                //let commandResult: any = undefined;
+                let commandResult: any = undefined;
                 try 
                 {
                     // handleCommand может быть async, поэтому await
@@ -256,18 +256,18 @@ const createWebSocket = (port = 5001) => {
                     commandResult = await handleCommand(commandObj);
                     console.log("========== идём 2222 ==========");
 
-                    if(typeof commandResult == "number")
-                    {
-                        console.log("========== идём 3333 ==========");
-                        id = commandResult;
-                        console.log("========== идём 4444 ==========");
-                    }
-                    else if (typeof commandResult != "number" && typeof commandResult != "boolean")
-                    {
-                        console.log("========== идём 5555 ==========");
-                        namess = commandResult;
-                        console.log("========== идём 6666 ==========");
-                    }
+                    // if(typeof commandResult == "number")
+                    // {
+                    //     console.log("========== идём 3333 ==========");
+                    //     id = commandResult;
+                    //     console.log("========== идём 4444 ==========");
+                    // }
+                    // else if (typeof commandResult != "number" && typeof commandResult != "boolean")
+                    // {
+                    //     console.log("========== идём 5555 ==========");
+                    //     namess = commandResult;
+                    //     console.log("========== идём 6666 ==========");
+                    // }
                 } 
                 catch (err) 
                 {
