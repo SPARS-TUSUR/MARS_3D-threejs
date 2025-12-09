@@ -83,231 +83,55 @@ const createWebSocket = (port = 5001) => {
     //     }
     // };
 
-    // Поместите этот код вместо старого socket.onmessage
-        socket.onmessage = async (ev) => {
-        // --- Вспомогательные утилиты -------------------------------------------
+    socket.onmessage = async (ev) => 
+    {
+        try 
+        {
+            // outer: { id: number, data: { name: "...", data: {...} } }
+            const outer = JSON.parse(ev.data as string);
 
-        // Конвертирует ev.data (string | ArrayBuffer | Blob) в текст
-        const toText = async (data: any): Promise<string> => {
-            if (typeof data === "string") return data;
-            if (data instanceof ArrayBuffer) {
-            return new TextDecoder("utf-8").decode(new Uint8Array(data));
-            }
-            if (data instanceof Blob) {
-            return await data.text();
-            }
-            // На всякий случай
-            return String(data);
-        };
-
-    // Извлекает *все* JSON-объекты из строки (учитывает строки и экранирование)
-        function extractJsonObjects(text: string): string[] {
-            const results: string[] = [];
-            let depth = 0;
-            let inString = false;
-            let escapeNext = false;
-            let startIndex = -1;
-
-            for (let i = 0; i < text.length; ++i) {
-            const ch = text[i];
-
-            if (escapeNext) {
-                escapeNext = false;
-                continue;
+            // basic validation
+            if (!outer || typeof outer !== "object") 
+            {
+                console.warn("Received non-object outer message", outer);
+                return;
             }
 
-            if (ch === '\\') {
-                escapeNext = true;
-                continue;
+            // inner command object is directly an object now
+            const commandObj = outer.data; // { name: "create"|"update"|..., data: {...} }
+            if (!commandObj || typeof commandObj !== "object")
+            {
+                console.warn("Outer.data is not an object:", outer.data);
+                return;
             }
 
-            if (ch === '"') {
-                inString = !inString;
-                continue;
-            }
+            console.log("Parsed command object:", commandObj);
 
-            if (inString) continue;
-
-            if (ch === '{') {
-                if (depth === 0) startIndex = i;
-                depth++;
-                continue;
-            }
-
-            if (ch === '}') {
-                depth--;
-                if (depth === 0 && startIndex !== -1) {
-                results.push(text.substring(startIndex, i + 1));
-                startIndex = -1;
-                }
-                continue;
-            }
-            }
-
-            return results;
-        }
-
-        // Пытаемся распарсить JSON, возвращаем undefined при ошибке
-        const tryParseJson = (s: string): any | undefined => {
+            // Теперь вызываем вашу существующую обработку (handleCommand),
+            // но у вас handleCommand в WebClient.ts ожидает IndexedCommand ранее.
+            // Подстроим: если у вас есть функция handleCommand(command: Command) — вызовите её.
+            // Например:
             try 
             {
-                return JSON.parse(s);
-            } 
-            catch 
-            {
-                return undefined;
+                // Если ваша handleCommand ожидает объект с полями name и data — это совпадает.
+                const result = await handleCommand(commandObj as any);
+                console.log("handleCommand result:", result);
             }
-        };
+            catch (err) 
+            {
+                console.error("Ошибка при выполнении handleCommand:", err);
+            }
 
-        // --- Начало обработчика ------------------------------------------------
-        let rawText: string;
-        try {
-            rawText = await toText(ev.data);
+            // Если требуется, можно отправить клиенту ответ-ack:
+            // const response = { id: outer.id, isResult: true, data: JSON.stringify({ ... }) };
+            // socket.send(JSON.stringify(response));
         } 
+        
         catch (err) 
         {
-            console.error("socket.onmessage: Не удалось прочитать данные фрейма:", err);
-            return;
+            console.error("Ошибка парсинга сообщения от сервера:", err, ev.data);
         }
-
-        console.log("RAW MESSAGE RECEIVED:", rawText);
-
-        const chunks = extractJsonObjects(rawText);
-        if (chunks.length === 0) 
-        {
-            console.warn("socket.onmessage: В фрейме не найдено JSON-объектов.");
-            return;
-        }
-
-        // Обрабатываем каждый найденный JSON-объект (chunk) по очереди
-        for (const chunk of chunks) 
-        {
-            console.log("Обрабатываем каждый найденный JSON-объект (chunk) по очереди");
-            let outer: any;
-            try 
-            {
-                outer = JSON.parse(chunk);
-            } 
-            catch (err) 
-            {
-                console.error("socket.onmessage: Ошибка парсинга внешнего JSON-чанка:", err, "chunk:", chunk);
-                continue;
-            }
-
-            // outerId — id из внешней обертки (если есть). Будем использовать его при отправке ответа.
-            const outerId: number | null = typeof outer === "object" && outer !== null && typeof outer.id === "number" ? outer.id : 0;
-            console.log("outerId — id из внешней обертки (если есть). Будем использовать его при отправке ответа.");
-
-            // Нормализуем внутренний commandObj в формат { name: string, data: any }
-            let commandObj: any | null = null;
-            console.log("Нормализуем внутренний commandObj в формат { name: string, data: any }");
-
-            // Если outer.data — строка с JSON => это IndexedCommand
-            if (outer && typeof outer === "object" && typeof outer.data === "string") 
-            {
-                console.log("Если outer.data — строка с JSON => это IndexedCommand");
-                // пытаемся распарсить внутреннюю строку
-                commandObj = tryParseJson(outer.data);
-                if (!commandObj) 
-                {
-                    console.log("lenient-попытка: заменить одинарные кавычки на двойные (на случай хаков)");
-                    // lenient-попытка: заменить одинарные кавычки на двойные (на случай хаков)
-                    try 
-                    {
-                        const sanitized = outer.data.replace(/'/g, '"');
-                        commandObj = JSON.parse(sanitized);
-                    } 
-                    catch (err) 
-                    {
-                        console.error("socket.onmessage: Не удалось распарсить outer.data как JSON:", err, "outer.data:", outer.data);
-                        continue;
-                    }
-                }
-            }
-            // Если outer уже похож на command (имеет поле name) — используем его напрямую
-            else if (outer && typeof outer === "object" && typeof outer.name === "string") 
-            {
-                console.log("Если outer уже похож на command (имеет поле name) — используем его напрямую");
-                commandObj = outer;
-            } 
-            else 
-            {
-                console.warn("socket.onmessage: JSON не соответствует ни IndexedCommand, ни Direct Command:", outer);
-                continue;
-            }
-
-            // --- Здесь вызываем старую логику handleCommand и формируем ответ ---
-            try 
-            {
-                console.log("--- Здесь вызываем старую логику handleCommand и формируем ответ ---");
-                // Логируем распарсенный объект команды (полезно для отладки)
-                console.log("Parsed command object:", commandObj);
-
-                // Вызов старой логики (функция handleCommand уже должна быть в том же файле/модуле)
-                // handleCommand возвращает: number | boolean | array/other | undefined (в твоём коде)
-                let commandResult: any = undefined;
-                try 
-                {
-                    console.log("handleCommand может быть async, поэтому await");
-                    // handleCommand может быть async, поэтому await
-                    commandResult = await handleCommand(commandObj);
-                } 
-                catch (err) 
-                {
-                    console.warn("socket.onmessage: handleCommand выбросил исключение:", err);
-                    commandResult = undefined;
-                }
-
-                // Подготовим формат ответа так, как это делалось раньше
-                // id (в теле ответа) — если handleCommand вернул число, считаем это id созданного объекта
-                let createdId: number | null = null;
-                let names: any | null = null;
-                if (typeof commandResult === "number")
-                {
-                    createdId = commandResult;
-                } 
-                else if (typeof commandResult !== "number" && typeof commandResult !== "boolean") 
-                {
-                names = commandResult;
-                }
-
-                const responsePayload = {
-                    name: commandObj.name,
-                    id: commandObj.data?.id || createdId,
-                    data: { id: createdId, names },
-                    isSuccess: commandResult !== undefined
-                };
-
-                const wrapperResponse = {
-                    id: outerId,      // outerId = 0 если его не было — можно менять на null, если нужно
-                    isResult: true,
-                    data: JSON.stringify(responsePayload)
-                };
-
-                // Отправляем ответ назад (если socket существует)
-                try 
-                {
-                    if (socket) 
-                    {
-                        socket.send(JSON.stringify(wrapperResponse));
-                    } 
-                    else 
-                    {
-                    console.warn("socket.onmessage: socket === undefined, не могу отправить ответ.");
-                    }
-                } 
-                catch (err) 
-                {
-                    console.error("socket.onmessage: Ошибка при отправке ответа:", err);
-                }
-
-            } 
-            catch (err) 
-            {
-                console.error("socket.onmessage: Ошибка при обработке команды:", err);
-            }
-        } // конец for chunks
-    }; // конец socket.onmessage
+    };
 
 
     socket.onclose = (ev) => {

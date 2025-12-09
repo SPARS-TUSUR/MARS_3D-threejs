@@ -35,7 +35,35 @@ const getAllObjects = () => MainScene.children
  */
 const create = (params: CustomObjectParams) => {
     const object = createObject(params)
+
+    // --- ОТЛАДОЧНЫЕ ИЗМЕНЕНИЯ: ---
+    // Гарантируем видимость и отключаем фрум-калинг временно,
+    // чтобы объект не "выпадал" из отрисовки
+    object.visible = true;
+    if (object instanceof Mesh) {
+        object.frustumCulled = false;
+        // на всякий случай включим тени (опционально)
+        object.castShadow = true;
+        object.receiveShadow = true;
+    }
+
     MainScene.add(object)
+
+    // Информация для дебага
+    try {
+        console.log("[ObjectManager.create] Добавлен объект id=", object.id,
+            " type=", (object as any).type,
+            " pos=", object.position.toArray(),
+            " scale=", object.scale.toArray(),
+            " children count=", MainScene.children.length);
+        if (object instanceof Mesh) {
+            console.log("[ObjectManager.create] geometry:", !!object.geometry, " material:", !!object.material);
+        }
+    } catch (e) {
+        // ничего страшного
+        console.warn("[ObjectManager.create] logging failed", e);
+    }
+
     return object.id
 }
 
