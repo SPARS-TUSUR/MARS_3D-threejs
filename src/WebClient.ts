@@ -115,6 +115,7 @@ const createWebSocket = (port = 5001) => {
             {
                 // Если ваша handleCommand ожидает объект с полями name и data — это совпадает.
                 const result = await handleCommand(commandObj as any);
+                console.log("[handleCommand] update data:", commandObj);
                 console.log("handleCommand result:", result);
             }
             catch (err) 
@@ -167,7 +168,10 @@ const handleCommand = async (command: Command) => {
             return create(command.data);
         case "update":
             if (command.data.id != undefined)
+            {
+                console.log("[WS] update", command.data.id, command.data);
                 return update(command.data.id, command.data);
+            }
             throw "Id required, but not provided"
         case "update_by_name":
             if (command.data.name != undefined)

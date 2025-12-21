@@ -1,31 +1,44 @@
 // components/ThreeCanvas.tsx
 import { OrbitControls, Stats } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useState } from "react";
-import { getMainScene, onSceneChange } from "../threejs/ObjectManager"; // <- note imports
+import { getMainScene, onSceneChange } from "../threejs/ObjectManager";
+
+/**
+ * Вспомогательный компонент, который
+ * принудительно сообщает Canvas о необходимости перерисовки
+ */
+function SceneWrapper({ scene }: { scene: THREE.Scene }) {
+  const { invalidate } = useThree();
+
+  useEffect(() => {
+    invalidate(); 
+  }, [scene, invalidate]);
+
+  return <primitive object={scene} />;
+}
 
 const ThreeCanvas = () => {
   const [scene, setScene] = useState(() => getMainScene());
-  //const [camera] = useState(() => MainCamera)
 
   useEffect(() => {
-    // Подписываемся на смену сцены
     const unsubscribe = onSceneChange((newScene) => {
-      setScene(newScene)
-    })
-    // Отписка при unmount
-    return () => unsubscribe()
-  }, [])
+      console.log("[ThreeCanvas] Scene changed");
+      setScene(newScene);
+      console.log("[Canvas] scene updated", scene.uuid);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <Canvas
       id="main_canvas"
-      style={{ width: `100%`, height: `100vh` }}
+      style={{ width: "100%", height: "100vh" }}
       shadows
-      //camera={camera}
     >
-      {/* Используем текущее состояние сцены */}
-      <primitive object={scene} />
+      <SceneWrapper scene={scene} />
+
       <OrbitControls />
       <ambientLight intensity={0.5} />
       <directionalLight intensity={0.5} position={[6, 3, 1]} />

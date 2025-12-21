@@ -5,6 +5,28 @@ import { getAllObjectsWithName, LoadModel, LoadModel_OBJ, loadTexture } from "./
 import { Color, Mesh, Scene } from "three";
 import { sleep } from "../utils";
 
+let sceneVersion = 0;
+const sceneVersionSubscribers: ((v: number) => void)[] = [];
+
+export const onSceneVersionChange = (cb: (v: number) => void) => {
+  sceneVersionSubscribers.push(cb);
+  return () => {
+    const i = sceneVersionSubscribers.indexOf(cb);
+    if (i >= 0) sceneVersionSubscribers.splice(i, 1);
+  };
+};
+
+const markSceneDirty = () => {
+  sceneVersion++;
+  sceneVersionSubscribers.forEach(cb => cb(sceneVersion));
+};
+
+let sceneChangeListeners: ((scene: THREE.Scene) => void)[] = [];
+
+const notifySceneChange = () => {
+    sceneChangeListeners.forEach(cb => cb(getMainScene()));
+};
+
 let currentScene: THREE.Scene = new THREE.Scene();        // <-- заменили const на let
 const camera = new THREE.PerspectiveCamera(45)
 const worldVector = new THREE.Vector3()
@@ -121,29 +143,21 @@ const getAllObjects = () => currentScene.children
  * @returns id: number
  */
 const create = (params: CustomObjectParams) => {
-    const object = createObject(params)
+    const object = createObject(params);
 
-    // Гарантируем видимость и отключаем фрум-калинг временно,
-    // чтобы объект не "выпадал" из отрисовки
     object.visible = true;
     if (object instanceof Mesh) {
         object.frustumCulled = false;
-        object.castShadow = true;
-        object.receiveShadow = true;
     }
 
-    currentScene.add(object)
+    currentScene.add(object);
 
-    // Информация для дебага
-    try {
-        console.log("[ObjectManager.create] Добавлен объект id=", object.id,
-            " pos=", object.position.toArray(),
-            " scale=", object.scale.toArray(),
-            " children count=", currentScene.children.length);
-    } catch (e) {}
+    object.updateMatrixWorld(true);
+    markSceneDirty();
 
-    return object.id
-}
+    return object.id;
+};
+
 
 const create_model_OBJ = (model_name: string) => {
     console.log("create_model", model_name)
@@ -203,14 +217,36 @@ const add_texture = (id: number, path: string) => {
 }
 
 const update = (id: number, params: CustomObjectParams) => {
-    const object = getObjectById(id)
+    const object = getObjectById(id);
 
-    if (object) {
-        setParamsToObject3D(object, params)
+    if (!object) {
+        console.warn("[update] object not found:", id);
+        return;
     }
 
-    return object?.id
-}
+    // 🔹 позиция
+    if (params.position) {
+        object.position.set(
+            params.position[0],
+            params.position[1],
+            params.position[2]
+        );
+    }
+
+    // 🔹 обязательно!
+    object.updateMatrix();
+    object.updateMatrixWorld(true);
+
+    // 🔹 помечаем сцену как изменённую
+    markSceneDirty();
+
+    console.log("[update] applied", {
+        id,
+        pos: object.position.toArray()
+    });
+
+    return id;
+};
 
 const updateByName = (name: string, params: CustomObjectParams) => {
     const object = getObjectByName(name)
